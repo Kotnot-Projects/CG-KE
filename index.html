@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ChickenGun Kotnot Edition 🐔</title>
+    <style>
+        /* ============================================================
+           ГЛОБАЛЬНЫЕ СТИЛИ
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Основной контейнер игры */
+        #gameContainer {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            border: 3px solid #e94560;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #16213e;
+        }
+
+        /* Игровой холст */
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #16213e;
+            touch-action: none;
+        }
+
+        /* ============================================================
+           ИНТЕРФЕЙС (поверх игры)
+           ============================================================ */
+        
+        /* Верхняя панель с HP и деньгами */
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            pointer-events: none; /* чтобы не мешать кликам по игре */
+            z-index: 10;
+        }
+
+        #hud span {
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .hp-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hp-fill {
+            width: 80px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .hp-fill-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #2ecc71);
+            transition: width 0.3s;
+            width: 100%;
+        }
+
+        /* Нижняя панель с оружием */
+        #weaponBar {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: rgba(0,0,0,0.7);
+            padding: 6px 12px;
+            border-radius: 16px;
+            border: 1px solid #e94560;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .weapon-slot {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .weapon-slot.active {
+            border-color: #f1c40f;
+            background: rgba(241, 196, 15, 0.2);
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.3);
+        }
+
+        .weapon-slot img {
+            width: 30px;
+            height: 30px;
+            object-fit: contain;
+        }
+
+        /* Кнопки управления (меню, магазин, настройки) */
+        .menu-btn {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #e94560;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            touch-action: manipulation;
+        }
+
+        .menu-btn:active {
+            transform: scale(0.9);
+        }
+
+        #menuBtn { top: 10px; right: 10px; }
+        #shopBtn { bottom: 10px; left: 10px; }
+        #settingsBtn { bottom: 10px; right: 10px; }
+
+        /* ============================================================
+           МОДАЛЬНЫЕ ОКНА (Меню, Магазин, Настройки)
+           ============================================================ */
+        
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            display: none;
+            /* Центрирование содержимого */
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(145deg, #1a1a3e, #0d0d2b);
+            border: 2px solid #e94560;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 360px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            box-shadow: 0 20px 60px rgba(233, 69, 96, 0.3);
+        }
+
+        .modal h2 {
+            text-align: center;
+            margin-bottom: 16px;
+            color: #f1c40f;
+            font-size: 22px;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 10px;
+        }
+
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #e94560;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* Список предметов в магазине */
+        .shop-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .shop-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .shop-item-info img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .shop-item-info div {
+            font-size: 13px;
+        }
+
+        .shop-item-info .name {
+            font-weight: bold;
+            color: #f1c40f;
+        }
+
+        .shop-item-info .price {
+            color: #aaa;
+            font-size: 11px;
+        }
+
+        .shop-buy-btn {
+            padding: 4px 16px;
+            background: #2ecc71;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .shop-buy-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .shop-buy-btn:active:not(:disabled) {
+            transform: scale(0.9);
+        }
+
+        /* Настройки */
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .setting-row label {
+            font-size: 14px;
+        }
+
+        .setting-row input[type="range"] {
+            width: 120px;
+            accent-color: #e94560;
+            background: transparent;
+        }
+
+        .setting-row select {
+            background: #2a2a4a;
+            color: white;
+            border: 1px solid #e94560;
+            border-radius: 6px;
+            padding: 4px 8px;
+        }
+
+        .setting-row .toggle {
+            width: 40px;
+            height: 22px;
+            background: #555;
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            transition: 0.3s;
+        }
+
+        .setting-row .toggle.active {
+            background: #2ecc71;
+        }
+
+        .setting-row .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .setting-row .toggle.active::after {
+            left: 20px;
+        }
+
+        /* Список скинов */
+        .skin-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .skin-item {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .skin-item.active {
+            border-color: #f1c40f;
+            background: rgba(241, 196, 15, 0.1);
+        }
+
+        .skin-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+        }
+
+        .skin-item .skin-name {
+            font-size: 10px;
+            margin-top: 4px;
+            color: #aaa;
+        }
+
+        /* ============================================================
+           АДАПТИВНОСТЬ
+           ============================================================ */
+        @media (max-width: 420px) {
+            #gameContainer {
+                width: 100vw;
+                height: 100vh;
+                border: none;
+                border-radius: 0;
+            }
+            .modal {
+                max-height: 90vh;
+                padding: 16px;
+            }
+            .setting-row input[type="range"] {
+                width: 80px;
+            }
+        }
+
+        /* Стилизация скролла */
+        .modal::-webkit-scrollbar {
+            width: 4px;
+        }
+        .modal::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        .modal::-webkit-scrollbar-thumb {
+            background: #e94560;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================
+         ИГРОВОЙ КОНТЕЙНЕР
+         ============================================================ -->
+    <div id="gameContainer">
+        
+        <!-- Холст для рисования игры -->
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+        <!-- ==================== HUD (интерфейс поверх игры) ==================== -->
+        <div id="hud">
+            <div class="hp-bar">
+                <span>❤️</span>
+                <div class="hp-fill">
+                    <div class="hp-fill-inner" id="hpFill" style="width:100%"></div>
+                </div>
+                <span id="hpText">100</span>
+            </div>
+            <span id="moneyDisplay">💰 0</span>
+        </div>
+
+        <!-- Панель оружия -->
+        <div id="weaponBar">
+            <div class="weapon-slot active" data-weapon="pistol">🔫</div>
+            <div class="weapon-slot" data-weapon="ak47">AK</div>
+            <div class="weapon-slot" data-weapon="m16">M16</div>
+            <div class="weapon-slot" data-weapon="rpg">💥</div>
+            <div class="weapon-slot" data-weapon="awp">🎯</div>
+        </div>
+
+        <!-- Кнопки меню -->
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <button class="menu-btn" id="shopBtn">🏪</button>
+        <button class="menu-btn" id="settingsBtn">⚙️</button>
+
+        <!-- ==================== МОДАЛЬНОЕ ОКНО МЕНЮ ==================== -->
+        <div class="modal-overlay" id="menuModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('menuModal')">✕</button>
+                <h2>🐔 ChickenGun</h2>
+                <div style="text-align:center;margin:10px 0;">
+                    <button onclick="setMode('Противники')" style="background:#e94560;border:none;color:white;padding:8px 20px;border-radius:8px;margin:4px;cursor:pointer;">👊 Противники</button>
+                    <button onclick="setMode('Обоссать холодос')" style="background:#3498db;border:none;color:white;padding:8px 20px;border-radius:8px;margin:4px;cursor:pointer;">❄️ Холодос</button>
+                    <button onclick="setMode('Грабеж Корованов')" style="background:#f39c12;border:none;color:white;padding:8px 20px;border-radius:8px;margin:4px;cursor:pointer;">💰 Корованы</button>
+                    <button onclick="setMode('Нагибать дворца')" style="background:#9b59b6;border:none;color:white;padding:8px 20px;border-radius:8px;margin:4px;cursor:pointer;">🏰 Дворец</button>
+                </div>
+                <div style="text-align:center;font-size:13px;color:#aaa;margin-top:10px;">
+                    Текущий режим: <span id="menuModeDisplay">Противники</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== МОДАЛЬНОЕ ОКНО МАГАЗИНА ==================== -->
+        <div class="modal-overlay" id="shopModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('shopModal')">✕</button>
+                <h2>🏪 Магазин</h2>
+                <div style="text-align:center;color:#f1c40f;margin-bottom:12px;">
+                    💰 <span id="shopMoney">0</span> ZWD
+                </div>
+                
+                <h3 style="font-size:14px;color:#aaa;margin:10px 0 6px;">🔫 Оружие</h3>
+                <div id="weaponShop"></div>
+                
+                <h3 style="font-size:14px;color:#aaa;margin:10px 0 6px;">🎨 Скины</h3>
+                <div class="skin-grid" id="skinShop"></div>
+            </div>
+        </div>
+
+        <!-- ==================== МОДАЛЬНОЕ ОКНО НАСТРОЕК ==================== -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('settingsModal')">✕</button>
+                <h2>⚙️ Настройки</h2>
+                
+                <div class="setting-row">
+                    <label>🌐 Язык</label>
+                    <select id="languageSelect">
+                        <option value="ru">Русский</option>
+                        <option value="en">English</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+                
+                <div class="setting-row">
+                    <label>🎵 Музыка</label>
+                    <div class="toggle active" id="musicToggle" onclick="toggleSetting('music')"></div>
+                </div>
+                
+                <div class="setting-row">
+                    <label>🔊 Звуки</label>
+                    <div class="toggle active" id="soundToggle" onclick="toggleSetting('sound')"></div>
+                </div>
+                
+                <div class="setting-row">
+                    <label>🎮 Чувствительность</label>
+                    <input type="range" min="1" max="10" value="5" id="sensitivitySlider">
+                </div>
+                
+                <div class="setting-row">
+                    <label>🖼️ Графика</label>
+                    <select id="graphicsSelect">
+                        <option value="high">Высокая</option>
+                        <option value="medium" selected>Средняя</option>
+                        <option value="low">Низкая</option>
+                    </select>
+                </div>
+                
+                <div style="text-align:center;margin-top:16px;font-size:12px;color:#666;">
+                    ChickenGun Kotnot Edition v2.0
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         ОСНОВНОЙ JAVASCRIPT КОД
+         ============================================================ -->
+    <script>
+        // ============================================================
+        // 1. ПОЛУЧЕНИЕ ДОСТУПА К ЭЛЕМЕНТАМ
+        // ============================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const hpFill = document.getElementById('hpFill');
+        const hpText = document.getElementById('hpText');
+        const moneyDisplay = document.getElementById('moneyDisplay');
+        const shopMoney = document.getElementById('shopMoney');
+
+        // ============================================================
+        // 2. ЗВУКИ (используем Web Audio API для генерации или загрузки)
+        // ============================================================
+        class SoundManager {
+            constructor() {
+                this.sounds = {};
+                this.enabled = true;
+                this.volume = 0.5;
+                this.loadSound('shoot', 'shoot.mp3');
+                this.loadSound('hit', 'hit.mp3');
+                this.loadSound('kill', 'kill.mp3');
+                this.loadSound('buy', 'buy.mp3');
+                this.loadSound('gameover', 'gameover.mp3');
+            }
+
+            /**
+             * Загружает звук из файла
+             */
+            loadSound(name, url) {
+                const audio = new Audio();
+                audio.src = url;
+                audio.preload = 'auto';
+                this.sounds[name] = audio;
+            }
+
+            /**
+             * Воспроизводит звук
+             */
+            play(name) {
+                if (!this.enabled) return;
+                const sound = this.sounds[name];
+                if (sound) {
+                    // Клонируем, чтобы можно было играть одновременно несколько
+                    const clone = sound.cloneNode();
+                    clone.volume = this.volume;
+                    clone.play().catch(() => {});
+                    // Удаляем после окончания
+                    clone.onended = () => clone.remove();
+                }
+            }
+
+            /**
+             * Включает/выключает звук
+             */
+            setEnabled(enabled) {
+                this.enabled = enabled;
+            }
+
+            /**
+             * Устанавливает громкость
+             */
+            setVolume(vol) {
+                this.volume = Math.max(0, Math.min(1, vol));
+            }
+        }
+
+        // Создаём глобальный менеджер звуков
+        const soundManager = new SoundManager();
+
+        // ============================================================
+        // 3. ЗАГРУЗКА ТЕКСТУР (ВАШИ PNG)
+        // ============================================================
+        const textures = {
+            chicken: null,   // 1.png
+            bum: null,       // 2.png
+            pig: null,       // 3.png
+            stepfather: null,// 4.png
+            monkey: null,    // 5.png
+            // Скины оружия (для отображения в магазине)
+            ak47: null,
+            m16: null,
+            rpg: null,
+            awp: null
+        };
+
+        /**
+         * Загружает все текстуры из файлов
+         */
+        function loadTextures() {
+            const textureMap = {
+                chicken: '1.png',
+                bum: '2.png',
+                pig: '3.png',
+                stepfather: '4.png',
+                monkey: '5.png',
+                ak47: 'ak.png',
+                m16: 'm.png',
+                rpg: 'rpg.png',
+                awp: 'awp.png'
+            };
+
+            Object.keys(textureMap).forEach(key => {
+                const img = new Image();
+                img.src = textureMap[key];
+                textures[key] = img;
+                img.onerror = () => console.warn(`Не удалось загрузить ${textureMap[key]}`);
+            });
+        }
+        loadTextures();
+
+        // ============================================================
+        // 4. ИГРОВЫЕ ПЕРЕМЕННЫЕ
+        // ============================================================
+        
+        // --- Игрок ---
+        const player = {
+            x: 185,
+            y: 520,
+            w: 30,
+            h: 30,
+            hp: 100,
+            maxHp: 100,
+            speed: 5
+        };
+
+        // --- Оружие и скины ---
+        const weapons = {
+            pistol: { name: 'Пистолет', damage: 15, fireRate: 10, speed: 8, icon: '🔫', price: 0 },
+            ak47: { name: 'AK-47', damage: 25, fireRate: 4, speed: 10, icon: '🔫', price: 5000 },
+            m16: { name: 'M16', damage: 20, fireRate: 3, speed: 12, icon: '🔫', price: 8000 },
+            rpg: { name: 'RPG', damage: 80, fireRate: 30, speed: 5, icon: '💥', price: 15000 },
+            awp: { name: 'AWP', damage: 50, fireRate: 20, speed: 15, icon: '🎯', price: 12000 }
+        };
+
+        let currentWeapon = 'pistol';
+        let fireCooldown = 0;
+
+        // --- Скины для игрока ---
+        const skins = [
+            { id: 'default', name: 'Обычная', price: 0, emoji: '🐔' },
+            { id: 'golden', name: 'Золотая', price: 10000, emoji: '🐓' },
+            { id: 'cyber', name: 'Кибер-курица', price: 25000, emoji: '🤖' },
+            { id: 'demon', name: 'Демоническая', price: 50000, emoji: '👿' },
+            { id: 'rainbow', name: 'Радужная', price: 75000, emoji: '🌈' }
+        ];
+
+        let currentSkin = 'default';
+        let ownedSkins = ['default']; // владеем по умолчанию
+
+        // --- Игровая валюта ---
+        let money = 0;
+
+        // --- Массивы объектов ---
+        let bullets = [];
+        let enemies = [];
+        let pickups = [];
+        let capturePoints = [];
+        let particles = [];
+
+        // --- Игровые переменные ---
+        let score = 0;
+        let gameMode = 'Противники';
+        let frameCount = 0;
+        let gameOver = false;
+
+        // --- Настройки ---
+        const settings = {
+            language: 'ru',
+            music: true,
+            sound: true,
+            sensitivity: 5,
+            graphics: 'medium'
+        };
+
+        // --- Управление ---
+        let isDragging = false;
+        let touchX = 185;
+
+        // ============================================================
+        // 5. ФУНКЦИИ МАГАЗИНА
+        // ============================================================
+        
+        /**
+         * Покупает предмет (оружие или скин)
+         */
+        function buyItem(type, id) {
+            let item;
+            let price;
+            
+            if (type === 'weapon') {
+                item = weapons[id];
+                price = item.price;
+                // Проверяем, не куплено ли уже
+                if (ownedWeapons && ownedWeapons.includes(id)) {
+                    showMessage('Уже куплено!');
+                    return;
+                }
+            } else if (type === 'skin') {
+                item = skins.find(s => s.id === id);
+                price = item.price;
+                if (ownedSkins.includes(id)) {
+                    showMessage('Уже куплено!');
+                    return;
+                }
+            }
+
+            if (money < price) {
+                showMessage('Недостаточно денег! 💰');
+                return;
+            }
+
+            // Покупаем
+            money -= price;
+            updateMoney();
+            
+            if (type === 'weapon') {
+                if (!ownedWeapons) ownedWeapons = ['pistol'];
+                ownedWeapons.push(id);
+                showMessage(`Куплено: ${item.name}!`);
+                soundManager.play('buy');
+            } else if (type === 'skin') {
+                ownedSkins.push(id);
+                currentSkin = id;
+                showMessage(`Скин ${item.name} активирован!`);
+                soundManager.play('buy');
+            }
+
+            renderShop();
+            updateWeaponBar();
+        }
+
+        /**
+         * Обновляет отображение денег
+         */
+        function updateMoney() {
+            moneyDisplay.textContent = `💰 ${money}`;
+            shopMoney.textContent = money;
+        }
+
+        /**
+         * Показывает временное сообщение
+         */
+        function showMessage(text) {
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.9);
+                color: #f1c40f;
+                padding: 16px 32px;
+                border-radius: 12px;
+                border: 2px solid #e94560;
+                font-family: monospace;
+                font-size: 18px;
+                z-index: 200;
+                pointer-events: none;
+                animation: fadeOut 1.5s forwards;
+            `;
+            document.getElementById('gameContainer').appendChild(msg);
+            
+            // Добавляем анимацию через keyframes
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeOut {
+                    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            setTimeout(() => {
+                msg.remove();
+                style.remove();
+            }, 1500);
+        }
+
+        // ============================================================
+        // 6. РЕНДЕРИНГ МАГАЗИНА
+        // ============================================================
+        let ownedWeapons = ['pistol'];
+
+        /**
+         * Отрисовывает магазин (оружие и скины)
+         */
+        function renderShop() {
+            // --- Оружие ---
+            const weaponShop = document.getElementById('weaponShop');
+            weaponShop.innerHTML = '';
+            
+            Object.keys(weapons).forEach(key => {
+                const w = weapons[key];
+                const owned = ownedWeapons.includes(key);
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                div.innerHTML = `
+                    <div class="shop-item-info">
+                        <span style="font-size:24px;">${w.icon}</span>
+                        <div>
+                            <div class="name">${w.name}</div>
+                            <div class="price">${owned ? '✅ Куплено' : `💰 ${w.price} ZWD`}</div>
+                            <div style="font-size:10px;color:#666;">Урон: ${w.damage}</div>
+                        </div>
+                    </div>
+                    <button class="shop-buy-btn" ${owned ? 'disabled' : ''} onclick="buyItem('weapon','${key}')">
+                        ${owned ? '✅' : 'Купить'}
+                    </button>
+                `;
+                weaponShop.appendChild(div);
+            });
+
+            // --- Скины ---
+            const skinShop = document.getElementById('skinShop');
+            skinShop.innerHTML = '';
+            
+            skins.forEach(skin => {
+                const owned = ownedSkins.includes(skin.id);
+                const active = currentSkin === skin.id;
+                const div = document.createElement('div');
+                div.className = `skin-item ${active ? 'active' : ''}`;
+                div.innerHTML = `
+                    <div style="font-size:32px;">${skin.emoji}</div>
+                    <div class="skin-name">${skin.name}</div>
+                    <div style="font-size:10px;color:#666;">
+                        ${owned ? (active ? '✅ Активен' : '✅ Куплен') : `💰 ${skin.price} ZWD`}
+                    </div>
+                `;
+                
+                // Клик для активации или покупки
+                div.onclick = () => {
+                    if (owned) {
+                        currentSkin = skin.id;
+                        renderShop();
+                        showMessage(`Скин ${skin.name} активирован!`);
+                    } else {
+                        buyItem('skin', skin.id);
+                    }
+                };
+                
+                skinShop.appendChild(div);
+            });
+
+            updateMoney();
+        }
+
+        // ============================================================
+        // 7. ОБНОВЛЕНИЕ ПАНЕЛИ ОРУЖИЯ
+        // ============================================================
+        function updateWeaponBar() {
+            const slots = document.querySelectorAll('.weapon-slot');
+            slots.forEach(slot => {
+                const weapon = slot.dataset.weapon;
+                slot.classList.toggle('active', weapon === currentWeapon);
+                // Показываем только купленное оружие
+                if (weapon !== 'pistol' && !ownedWeapons.includes(weapon)) {
+                    slot.style.opacity = '0.3';
+                    slot.style.pointerEvents = 'none';
+                } else {
+                    slot.style.opacity = '1';
+                    slot.style.pointerEvents = 'auto';
+                }
+            });
+        }
+
+        // Клик по оружию для смены
+        document.querySelectorAll('.weapon-slot').forEach(slot => {
+            slot.addEventListener('click', () => {
+                const weapon = slot.dataset.weapon;
+                if (weapon === 'pistol' || ownedWeapons.includes(weapon)) {
+                    currentWeapon = weapon;
+                    updateWeaponBar();
+                }
+            });
+        });
+
+        // ============================================================
+        // 8. УПРАВЛЕНИЕ РЕЖИМАМИ
+        // ============================================================
+        function setMode(mode) {
+            gameMode = mode;
+            modeSpan.textContent = mode;
+            document.getElementById('menuModeDisplay').textContent = mode;
+            closeModal('menuModal');
+            
+            // Очищаем врагов при смене режима
+            enemies = [];
+            pickups = [];
+            capturePoints = [];
+            
+            // Настройка режима
+            if (mode === 'Противники') {
+                // Стандартный режим
+            } else if (mode === 'Обоссать холодос') {
+                // Враги заморожены (медленнее)
+            } else if (mode === 'Грабеж Корованов') {
+                // Спавн предметов вместо врагов
+            } else if (mode === 'Нагибать дворца') {
+                // Точки захвата
+                spawnCapturePoints();
+            }
+            
+            showMessage(`Режим: ${mode}`);
+        }
+
+        /**
+         * Создаёт точки захвата для режима "Нагибать дворца"
+         */
+        function spawnCapturePoints() {
+            capturePoints = [];
+            const positions = [
+                { x: 50, y: 150 },
+                { x: 200, y: 100 },
+                { x: 350, y: 150 },
+                { x: 100, y: 300 },
+                { x: 300, y: 300 }
+            ];
+            positions.forEach(pos => {
+                capturePoints.push({
+                    x: pos.x,
+                    y: pos.y,
+                    w: 40,
+                    h: 40,
+                    captured: false,
+                    progress: 0,
+                    team: 'neutral' // neutral, player, enemy
+                });
+            });
+        }
+
+        // ============================================================
+        // 9. МОДАЛЬНЫЕ ОКНА
+        // ============================================================
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            if (id === 'shopModal') renderShop();
+            if (id === 'settingsModal') loadSettings();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // Обработчики кнопок
+        document.getElementById('menuBtn').addEventListener('click', () => openModal('menuModal'));
+        document.getElementById('shopBtn').addEventListener('click', () => openModal('shopModal'));
+        document.getElementById('settingsBtn').addEventListener('click', () => openModal('settingsModal'));
+
+        // Закрытие по клику на оверлей
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+        });
+
+        // ============================================================
+        // 10. НАСТРОЙКИ
+        // ============================================================
+        function toggleSetting(type) {
+            const toggle = document.getElementById(type + 'Toggle');
+            toggle.classList.toggle('active');
+            const enabled = toggle.classList.contains('active');
+            
+            if (type === 'music') {
+                settings.music = enabled;
+                // Здесь можно управлять фоновой музыкой
+            } else if (type === 'sound') {
+                settings.sound = enabled;
+                soundManager.setEnabled(enabled);
+            }
+        }
+
+        function loadSettings() {
+            // Загружаем текущие настройки в UI
+            document.getElementById('languageSelect').value = settings.language;
+            document.getElementById('graphicsSelect').value = settings.graphics;
+            document.getElementById('sensitivitySlider').value = settings.sensitivity;
+            
+            document.getElementById('musicToggle').classList.toggle('active', settings.music);
+            document.getElementById('soundToggle').classList.toggle('active', settings.sound);
+        }
+
+        // Обработчики изменения настроек
+        document.getElementById('languageSelect').addEventListener('change', (e) => {
+            settings.language = e.target.value;
+        });
+
+        document.getElementById('graphicsSelect').addEventListener('change', (e) => {
+            settings.graphics = e.target.value;
+        });
+
+        document.getElementById('sensitivitySlider').addEventListener('input', (e) => {
+            settings.sensitivity = parseInt(e.target.value);
+        });
+
+        // ============================================================
+        // 11. УПРАВЛЕНИЕ ИГРОКОМ (движение и стрельба)
+        // ============================================================
+        
+        /**
+         * Обрабатывает движение пальца/мыши
+         */
+        function handleMove(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = (clientX - rect.left) * (400 / rect.width);
+            
+            // Применяем чувствительность
+            const sens = settings.sensitivity / 5;
+            const targetX = Math.max(0, Math.min(400 - player.w, canvasX - player.w / 2));
+            player.x += (targetX - player.x) * 0.3 * sens;
+        }
+
+        // Мышь
+        canvas.addEventListener('mousemove', (e) => {
+            if (e.buttons > 0) {
+                handleMove(e.clientX);
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            handleMove(e.clientX);
+            shoot();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Тач
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleMove(touch.clientX);
+            shoot();
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleMove(touch.clientX);
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // ============================================================
+        // 12. СТРЕЛЬБА
+        // ============================================================
+        
+        /**
+         * Создаёт пулю с параметрами текущего оружия
+         */
+        function shoot() {
+            if (gameOver) return;
+            
+            // Проверка кулдауна
+            if (fireCooldown > 0) return;
+            
+            const weapon = weapons[currentWeapon];
+            fireCooldown = weapon.fireRate;
+            
+            // Создаём пулю
+            bullets.push({
+                x: player.x + player.w / 2 - 3,
+                y: player.y - 10,
+                w: 6,
+                h: 16,
+                speed: weapon.speed,
+                damage: weapon.damage,
+                isRPG: currentWeapon === 'rpg'
+            });
+            
+            // Звук выстрела
+            soundManager.play('shoot');
+            
+            // Эффект вспышки
+            createParticles(player.x + player.w/2, player.y, '#f1c40f', 5);
+        }
+
+        /**
+         * Создаёт частицы для эффектов
+         */
+        function createParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x, y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6 - 2,
+                    life: 20 + Math.random() * 20,
+                    maxLife: 40,
+                    size: 2 + Math.random() * 4,
+                    color: color
+                });
+            }
+        }
+
+        // ============================================================
+        // 13. ИГРОВАЯ ЛОГИКА (обновление)
+        // ============================================================
+        
+        /**
+         * Обновляет состояние игры каждый кадр
+         */
+        function update() {
+            if (gameOver) return;
+            
+            frameCount++;
+            
+            // Кулдаун стрельбы
+            if (fireCooldown > 0) fireCooldown--;
+            
+            // ---- Обновление пуль ----
+            bullets.forEach(b => {
+                b.y -= b.speed;
+                // Эффект трассера для RPG
+                if (b.isRPG) {
+                    createParticles(b.x + 3, b.y + 8, '#ff6600', 1);
+                }
+            });
+            bullets = bullets.filter(b => b.y > -50);
+
+            // ---- Обновление врагов ----
+            enemies.forEach(e => {
+                // Движение в зависимости от режима
+                let speedMod = 1;
+                if (gameMode === 'Обоссать холодос') {
+                    speedMod = 0.3; // Замедление
+                }
+                e.y += e.speed * speedMod;
+            });
+            enemies = enemies.filter(e => e.y < 650);
+
+            // ---- Столкновения пуль с врагами ----
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const b = bullets[i];
+                    const e = enemies[j];
+                    
+                    if (b.x < e.x + e.w && b.x + b.w > e.x &&
+                        b.y < e.y + e.h && b.y + b.h > e.y) {
+                        
+                        // Попадание
+                        e.hp -= b.damage;
+                        bullets.splice(i, 1);
+                        soundManager.play('hit');
+                        createParticles(b.x, b.y, '#ff4444', 8);
+                        
+                        if (e.hp <= 0) {
+                            // Убийство
+                            enemies.splice(j, 1);
+                            score += 10;
+                            money += 20 + Math.floor(Math.random() * 30);
+                            updateMoney();
+                            soundManager.play('kill');
+                            createParticles(e.x + e.w/2, e.y + e.h/2, '#ffdd00', 20);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // ---- Спавн врагов (в зависимости от режима) ----
+            if (gameMode === 'Противники' || gameMode === 'Обоссать холодос') {
+                if (Math.random() < 0.015) {
+                    spawnEnemy();
+                }
+            } else if (gameMode === 'Грабеж Корованов') {
+                if (Math.random() < 0.01) {
+                    spawnPickup();
+                }
+            } else if (gameMode === 'Нагибать дворца') {
+                updateCapturePoints();
+                if (Math.random() < 0.008) {
+                    spawnEnemy();
+                }
+            }
+
+            // ---- Обновление частиц ----
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1;
+                p.life--;
+            });
+            particles = particles.filter(p => p.life > 0);
+
+            // ---- Проверка Game Over ----
+            if (player.hp <= 0) {
+                gameOver = true;
+                soundManager.play('gameover');
+                showMessage('💀 ИГРА ОКОНЧЕНА!');
+            }
+        }
+
+        // ============================================================
+        // 14. СПАВН ОБЪЕКТОВ
+        // ============================================================
+        
+        /**
+         * Создаёт врага
+         */
+        function spawnEnemy() {
+            const types = ['bum', 'pig', 'monkey'];
+            // В режиме "Холодос" добавляем ледяных врагов
+            if (gameMode === 'Обоссать холодос') {
+                types.push('bum', 'pig');
+            }
+            
+            const type = types[Math.floor(Math.random() * types.length)];
+            const hp = type === 'pig' ? 40 : type === 'monkey' ? 25 : 30;
+            const speed = 0.5 + Math.random() * 1.5;
+            
+            enemies.push({
+                x: Math.random() * (400 - 30),
+                y: -30,
+                w: 28,
+                h: 28,
+                hp: hp,
+                maxHp: hp,
+                speed: speed,
+                type: type,
+                texture: textures[type]
+            });
+        }
+
+        /**
+         * Создаёт предмет для подбора (режим "Грабеж Корованов")
+         */
+        function spawnPickup() {
+            pickups.push({
+                x: Math.random() * (400 - 30),
+                y: -30,
+                w: 25,
+                h: 25,
+                value: 50 + Math.floor(Math.random() * 100),
+                type: Math.random() > 0.5 ? 'money' : 'health'
+            });
+        }
+
+        /**
+         * Обновляет точки захвата
+         */
+        function updateCapturePoints() {
+            capturePoints.forEach(point => {
+                // Проверяем, стоит ли игрок на точке
+                const onPoint = player.x + player.w > point.x &&
+                               player.x < point.x + point.w &&
+                               player.y + player.h > point.y &&
+                               player.y < point.y + point.h;
+                
+                if (onPoint && !point.captured) {
+                    point.progress += 0.5;
+                    if (point.progress >= 100) {
+                        point.captured = true;
+                        money += 200;
+                        updateMoney();
+                        showMessage('🏰 Точка захвачена! +200 ZWD');
+                        createParticles(point.x + point.w/2, point.y + point.h/2, '#00ff00', 30);
+                    }
+                } else if (!onPoint && point.progress > 0) {
+                    point.progress -= 0.2;
+                }
+            });
+        }
+
+        // ============================================================
+        // 15. ОТРИСОВКА ИГРЫ
+        // ============================================================
+        
+        /**
+         * Рисует всё на canvas
+         */
+        function draw() {
+            ctx.clearRect(0, 0, 400, 600);
+            
+            // ---- Фон ----
+            const gradient = ctx.createLinearGradient(0, 0, 0, 600);
+            gradient.addColorStop(0, '#16213e');
+            gradient.addColorStop(1, '#0a0a1a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 400, 600);
+            
+            // Рисуем сетку (эффект)
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 400; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, 600);
+                ctx.stroke();
+            }
+            for (let i = 0; i < 600; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(400, i);
+                ctx.stroke();
+            }
+            
+            // ---- Точки захвата (режим "Нагибать дворца") ----
+            capturePoints.forEach(point => {
+                const progress = point.progress / 100;
+                const color = point.captured ? '#2ecc71' : 
+                             progress > 0 ? '#f1c40f' : '#e74c3c';
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                ctx.fillRect(point.x, point.y, point.w, point.h);
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(point.x, point.y, point.w, point.h);
+                
+                // Прогресс захвата
+                if (!point.captured && progress > 0) {
+                    ctx.fillStyle = 'rgba(241, 196, 15, 0.3)';
+                    ctx.fillRect(point.x, point.y + point.h - 4, point.w * progress, 4);
+                }
+                
+                if (point.captured) {
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.font = '20px sans-serif';
+                    ctx.fillText('🏁', point.x + 10, point.y + 28);
+                } else {
+                    ctx.fillStyle = color;
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText('⚡', point.x + 14, point.y + 26);
+                }
+            });
+            
+            // ---- Предметы (режим "Грабеж Корованов") ----
+            pickups.forEach(p => {
+                ctx.fillStyle = p.type === 'money' ? '#f1c40f' : '#2ecc71';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = p.type === 'money' ? '#f1c40f' : '#2ecc71';
+                ctx.beginPath();
+                ctx.arc(p.x + p.w/2, p.y + p.h/2, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'white';
+                ctx.font = '16px sans-serif';
+                ctx.fillText(p.type === 'money' ? '💰' : '❤️', p.x + 2, p.y + 20);
+            });
+            
+            // ---- Враги ----
+            enemies.forEach(e => {
+                // Рисуем текстуру или заглушку
+                if (e.texture && e.texture.complete && e.texture.naturalWidth) {
+                    ctx.drawImage(e.texture, e.x, e.y, e.w, e.h);
+                } else {
+                    // Цвет в зависимости от типа
+                    const colors = {
+                        bum: '#8e44ad',
+                        pig: '#27ae60',
+                        monkey: '#d35400',
+                        stepfather: '#c0392b'
+                    };
+                    ctx.fillStyle = colors[e.type] || '#666';
+                    ctx.fillRect(e.x, e.y, e.w, e.h);
+                    
+                    // Эмодзи
+                    const emojis = {
+                        bum: '🧟',
+                        pig: '🐷',
+                        monkey: '🐒',
+                        stepfather: '👨'
+                    };
+                    ctx.fillStyle = 'white';
+                    ctx.font = '18px sans-serif';
+                    ctx.fillText(emojis[e.type] || '❓', e.x + 4, e.y + 22);
+                }
+                
+                // HP бар
+                const hpPercent = e.hp / e.maxHp;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(e.x, e.y - 8, e.w, 4);
+                ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : 
+                               hpPercent > 0.25 ? '#f1c40f' : '#e74c3c';
+                ctx.fillRect(e.x, e.y - 8, e.w * hpPercent, 4);
+                
+                // Эффект холода
+                if (gameMode === 'Обоссать холодос') {
+                    ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+                    ctx.fillRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
+                    ctx.strokeStyle = 'rgba(100, 200, 255, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(e.x - 2, e.y - 2, e.w + 4, e.h + 4);
+                }
+            });
+            
+            // ---- Пули ----
+            bullets.forEach(b => {
+                if (b.isRPG) {
+                    // RPG ракета
+                    const gradient = ctx.createRadialGradient(
+                        b.x + 3, b.y + 8, 2,
+                        b.x + 3, b.y + 8, 10
+                    );
+                    gradient.addColorStop(0, '#ff6600');
+                    gradient.addColorStop(0.5, '#ff4400');
+                    gradient.addColorStop(1, 'rgba(255,0,0,0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(b.x + 3, b.y + 8, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = b.isRPG ? '#ff4400' : '#f1c40f';
+                ctx.shadowBlur = b.isRPG ? 30 : 15;
+                ctx.shadowColor = b.isRPG ? '#ff4400' : '#f1c40f';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+                ctx.shadowBlur = 0;
+            });
+            
+            // ---- Игрок (курица со скином) ----
+            const skin = skins.find(s => s.id === currentSkin);
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#f1c40f';
+            
+            // Рисуем тело
+            ctx.fillStyle = '#f5c842';
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            
+            // Скин-эффект
+            if (currentSkin === 'golden') {
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+                ctx.fillRect(player.x, player.y, player.w, player.h);
+            } else if (currentSkin === 'cyber') {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(player.x, player.y, player.w, player.h);
+            } else if (currentSkin === 'demon') {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+                ctx.fillRect(player.x, player.y, player.w, player.h);
+            }
+            
+            // Эмодзи курицы
+            ctx.shadowBlur = 0;
+            ctx.font = '24px sans-serif';
+            ctx.fillText(skin ? skin.emoji : '🐔', player.x + 2, player.y + 24);
+            
+            // ---- Частицы ----
+            particles.forEach(p => {
+                const alpha = p.life / p.maxLife;
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+            });
+            ctx.globalAlpha = 1;
+            
+            // ---- Интерфейс на canvas ----
+            ctx.fillStyle = 'white';
+            ctx.font = '12px monospace';
+            ctx.fillText(`🔫 ${weapons[currentWeapon].name}`, 10, 580);
+            ctx.fillText(`🎯 ${score}`, 350, 580);
+            
+            // ---- Game Over ----
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, 400, 600);
+                ctx.fillStyle = '#e94560';
+                ctx.font = 'bold 40px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('💀 GAME OVER', 200, 280);
+                ctx.fillStyle = 'white';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('Нажмите для рестарта', 200, 330);
+                ctx.textAlign = 'left';
+            }
+            
+            // Обновляем HUD
+            const hpPercent = player.hp / player.maxHp * 100;
+            hpFill.style.width = hpPercent + '%';
+            hpText.textContent = Math.floor(player.hp);
+        }
+
+        // ============================================================
+        // 16. ИГРОВОЙ ЦИКЛ
+        // ============================================================
+        
+        /**
+         * Главный цикл игры
+         */
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================
+        // 17. ЗАПУСК ИГРЫ
+        // ============================================================
+        
+        // Запускаем игру
+        gameLoop();
+        
+        // Инициализация
+        updateMoney();
+        updateWeaponBar();
+        renderShop();
+        setMode('Противники');
+
+        // ============================================================
+        // 18. РЕСТАРТ (по клику после Game Over)
+        // ============================================================
+        canvas.addEventListener('click', () => {
+            if (gameOver) {
+                // Рестарт
+                player.hp = player.maxHp;
+                gameOver = false;
+                enemies = [];
+                bullets = [];
+                particles = [];
+                score = 0;
+                money = 0;
+                updateMoney();
+                showMessage('🔄 Новая игра!');
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (gameOver) {
+                e.preventDefault();
+                player.hp = player.maxHp;
+                gameOver = false;
+                enemies = [];
+                bullets = [];
+                particles = [];
+                score = 0;
+                money = 0;
+                updateMoney();
+                showMessage('🔄 Новая игра!');
+            }
+        }, { passive: false });
+
+        // ============================================================
+        // 19. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // ============================================================
+        
+        // Сохраняем ссылки для использования в HTML onclick
+        window.setMode = setMode;
+        window.buyItem = buyItem;
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.toggleSetting = toggleSetting;
+
+        console.log('🐔 ChickenGun Kotnot Edition загружена!');
+        console.log('📖 Режимы: Противники, Обоссать холодос, Грабеж Корованов, Нагибать дворца');
+        console.log('🏪 Магазин: AK-47, M16, RPG, AWP + скины');
+        console.log('⚙️ Настройки: графика, звук, музыка, чувствительность, язык');
+        console.log('💰 Валюта: Зимбабвийский Доллар (ZWD)');
+    </script>
+</body>
+</html>
