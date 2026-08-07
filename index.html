@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ChickenGun Kotnot Edition 🐔</title>
+    <style>
+        /* ============================================================
+           ГЛОБАЛЬНЫЕ СТИЛИ
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 500px;
+            max-height: 800px;
+            background: #0a0a0a;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            touch-action: none;
+        }
+
+        /* ============================================================
+           СТИЛИ ДЛЯ 3D МЕНЮ (CSS 3D ТРАНСФОРМАЦИИ)
+           ============================================================ */
+        #menuOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 1000px;
+            backdrop-filter: blur(10px);
+            transition: opacity 0.5s;
+        }
+
+        #menuOverlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .menu-3d {
+            width: 90%;
+            max-width: 400px;
+            transform-style: preserve-3d;
+            animation: menuRotate 20s infinite linear;
+        }
+
+        @keyframes menuRotate {
+            0% { transform: rotateY(0deg) rotateX(5deg); }
+            100% { transform: rotateY(360deg) rotateX(5deg); }
+        }
+
+        .menu-3d-inner {
+            background: linear-gradient(145deg, rgba(26, 26, 62, 0.95), rgba(13, 13, 43, 0.95));
+            border: 2px solid #e94560;
+            border-radius: 20px;
+            padding: 30px;
+            transform: translateZ(50px);
+            box-shadow: 0 0 60px rgba(233, 69, 96, 0.3);
+            backdrop-filter: blur(20px);
+        }
+
+        .menu-3d-inner h1 {
+            text-align: center;
+            font-size: 32px;
+            color: #f1c40f;
+            text-shadow: 0 0 30px rgba(241, 196, 15, 0.3);
+            margin-bottom: 5px;
+        }
+
+        .menu-3d-inner .subtitle {
+            text-align: center;
+            color: #aaa;
+            font-size: 12px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .menu-3d-inner .chicken-icon {
+            text-align: center;
+            font-size: 60px;
+            margin-bottom: 15px;
+            animation: chickenBounce 2s infinite;
+        }
+
+        @keyframes chickenBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(1.05); }
+        }
+
+        .menu-btn-3d {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin: 8px 0;
+            background: rgba(233, 69, 96, 0.2);
+            border: 2px solid #e94560;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .menu-btn-3d:hover {
+            background: rgba(233, 69, 96, 0.4);
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+        }
+
+        .menu-btn-3d:active {
+            transform: scale(0.95);
+        }
+
+        .menu-btn-3d.primary {
+            background: #e94560;
+            border-color: #e94560;
+            font-weight: bold;
+        }
+
+        .menu-btn-3d.primary:hover {
+            background: #ff6b81;
+            box-shadow: 0 0 40px rgba(233, 69, 96, 0.5);
+        }
+
+        .menu-version {
+            text-align: center;
+            color: #444;
+            font-size: 10px;
+            margin-top: 15px;
+        }
+
+        /* ============================================================
+           ИНТЕРФЕЙС ИГРЫ
+           ============================================================ */
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            font-size: 13px;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #hud span {
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .hp-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hp-fill {
+            width: 80px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .hp-fill-inner {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #2ecc71);
+            transition: width 0.3s;
+            width: 100%;
+        }
+
+        #weaponDisplay {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 8px 16px;
+            border-radius: 16px;
+            border: 2px solid #e94560;
+            color: white;
+            font-size: 14px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        #weaponDisplay .weapon-icon {
+            font-size: 28px;
+        }
+
+        #weaponDisplay .weapon-name {
+            font-size: 13px;
+            color: #f1c40f;
+        }
+
+        #weaponDisplay .weapon-damage {
+            font-size: 11px;
+            color: #aaa;
+        }
+
+        /* Контроллеры для мобилок */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(233, 69, 96, 0.3);
+            border: 2px solid rgba(233, 69, 96, 0.5);
+            color: white;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .control-btn:active {
+            transform: scale(0.9);
+            background: rgba(233, 69, 96, 0.5);
+        }
+
+        .control-btn.shoot {
+            width: 80px;
+            height: 80px;
+            font-size: 16px;
+            background: rgba(231, 76, 60, 0.4);
+            border-color: #e74c3c;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 4px;
+            pointer-events: none;
+        }
+
+        .dpad-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .dpad-btn:active {
+            background: rgba(255,255,255,0.2);
+            transform: scale(0.9);
+        }
+
+        .dpad-btn.empty {
+            background: transparent;
+            border: none;
+            pointer-events: none;
+        }
+
+        /* ============================================================
+           АДАПТИВНОСТЬ
+           ============================================================ */
+        @media (max-width: 500px) {
+            .dpad {
+                grid-template-columns: 50px 50px 50px;
+                grid-template-rows: 50px 50px 50px;
+                gap: 3px;
+            }
+            .dpad-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 16px;
+            }
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            .control-btn.shoot {
+                width: 70px;
+                height: 70px;
+            }
+            #weaponDisplay {
+                bottom: 70px;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            #weaponDisplay .weapon-icon {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- ==================== 3D МЕНЮ ==================== -->
+        <div id="menuOverlay">
+            <div class="menu-3d">
+                <div class="menu-3d-inner">
+                    <div class="chicken-icon">🐔</div>
+                    <h1>CHICKENGUN</h1>
+                    <div class="subtitle">✦ KOTNOT EDITION ✦</div>
+                    
+                    <button class="menu-btn-3d primary" onclick="startGame()">🎮 НАЧАТЬ ИГРУ</button>
+                    <button class="menu-btn-3d" onclick="openModal('shopModal')">🏪 МАГАЗИН</button>
+                    <button class="menu-btn-3d" onclick="openModal('settingsModal')">⚙️ НАСТРОЙКИ</button>
+                    <button class="menu-btn-3d" onclick="openModal('modeModal')">🎯 РЕЖИМЫ</button>
+                    
+                    <div class="menu-version">v3.0 | Зимбабвийский Доллар 💰</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== HUD ==================== -->
+        <div id="hud" style="display:none;">
+            <div class="hp-bar">
+                <span>❤️</span>
+                <div class="hp-fill">
+                    <div class="hp-fill-inner" id="hpFill" style="width:100%"></div>
+                </div>
+                <span id="hpText">100</span>
+            </div>
+            <span id="moneyDisplay">💰 0</span>
+        </div>
+
+        <!-- ==================== ОТОБРАЖЕНИЕ ОРУЖИЯ ==================== -->
+        <div id="weaponDisplay" style="display:none;">
+            <span class="weapon-icon" id="weaponIcon">🔫</span>
+            <div>
+                <div class="weapon-name" id="weaponName">Пистолет</div>
+                <div class="weapon-damage" id="weaponDamage">Урон: 15</div>
+            </div>
+        </div>
+
+        <!-- ==================== УПРАВЛЕНИЕ ==================== -->
+        <div id="controls" style="display:none;">
+            <div class="dpad">
+                <div class="dpad-btn empty"></div>
+                <div class="dpad-btn" id="btnUp">▲</div>
+                <div class="dpad-btn empty"></div>
+                <div class="dpad-btn" id="btnLeft">◄</div>
+                <div class="dpad-btn empty"></div>
+                <div class="dpad-btn" id="btnRight">►</div>
+                <div class="dpad-btn empty"></div>
+                <div class="dpad-btn" id="btnDown">▼</div>
+                <div class="dpad-btn empty"></div>
+            </div>
+            <button class="control-btn shoot" id="btnShoot">💥</button>
+        </div>
+
+        <!-- ==================== МОДАЛЬНЫЕ ОКНА ==================== -->
+        
+        <!-- Режимы -->
+        <div class="modal-overlay" id="modeModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('modeModal')">✕</button>
+                <h2>🎯 Режимы</h2>
+                <div class="mode-grid" id="modeGrid"></div>
+            </div>
+        </div>
+
+        <!-- Магазин -->
+        <div class="modal-overlay" id="shopModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('shopModal')">✕</button>
+                <h2>🏪 Магазин</h2>
+                <div style="text-align:center;color:#f1c40f;margin-bottom:12px;">
+                    💰 <span id="shopMoney">0</span> ZWD
+                </div>
+                <h3 style="font-size:14px;color:#aaa;margin:10px 0 6px;">🔫 Оружие</h3>
+                <div id="weaponShop"></div>
+                <h3 style="font-size:14px;color:#aaa;margin:10px 0 6px;">🎨 Скины</h3>
+                <div class="skin-grid" id="skinShop"></div>
+            </div>
+        </div>
+
+        <!-- Настройки -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <button class="modal-close" onclick="closeModal('settingsModal')">✕</button>
+                <h2>⚙️ Настройки</h2>
+                <div class="setting-row">
+                    <label>🎮 Чувствительность</label>
+                    <input type="range" min="1" max="10" value="5" id="sensitivitySlider">
+                </div>
+                <div class="setting-row">
+                    <label>🖼️ Графика</label>
+                    <select id="graphicsSelect">
+                        <option value="high">Высокая</option>
+                        <option value="medium" selected>Средняя</option>
+                        <option value="low">Низкая</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Стили модальных окон (те же что и раньше) */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            backdrop-filter: blur(5px);
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: linear-gradient(145deg, #1a1a3e, #0d0d2b);
+            border: 2px solid #e94560;
+            border-radius: 16px;
+            padding: 24px;
+            width: 100%;
+            max-width: 360px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: white;
+            box-shadow: 0 20px 60px rgba(233,69,96,0.3);
+        }
+        .modal h2 {
+            text-align: center;
+            margin-bottom: 16px;
+            color: #f1c40f;
+            font-size: 22px;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 10px;
+        }
+        .modal-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #e94560;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .mode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .mode-card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .mode-card:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: #e94560;
+        }
+        .mode-card.active {
+            border-color: #f1c40f;
+            background: rgba(241,196,15,0.1);
+        }
+        .mode-card .icon {
+            font-size: 32px;
+            display: block;
+        }
+        .mode-card .name {
+            font-size: 13px;
+            margin-top: 6px;
+            font-weight: bold;
+        }
+        .mode-card .desc {
+            font-size: 10px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        .shop-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 6px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .shop-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .shop-item-info .name {
+            font-weight: bold;
+            color: #f1c40f;
+        }
+        .shop-item-info .price {
+            color: #aaa;
+            font-size: 11px;
+        }
+        .shop-buy-btn {
+            padding: 4px 16px;
+            background: #2ecc71;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .shop-buy-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .skin-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .skin-item {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .skin-item.active {
+            border-color: #f1c40f;
+            background: rgba(241,196,15,0.1);
+        }
+        .skin-item .skin-name {
+            font-size: 10px;
+            margin-top: 4px;
+            color: #aaa;
+        }
+        .skin-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .setting-row label {
+            font-size: 14px;
+        }
+        .setting-row input[type="range"] {
+            width: 120px;
+            accent-color: #e94560;
+        }
+        .setting-row select {
+            background: #2a2a4a;
+            color: white;
+            border: 1px solid #e94560;
+            border-radius: 6px;
+            padding: 4px 8px;
+        }
+        .modal::-webkit-scrollbar {
+            width: 4px;
+        }
+        .modal::-webkit-scrollbar-thumb {
+            background: #e94560;
+            border-radius: 2px;
+        }
+    </style>
+
+    <script>
+        // ============================================================
+        // 1. НАСТРОЙКА CANVAS
+        // ============================================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            const container = document.getElementById('gameContainer');
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width || 400;
+            canvas.height = rect.height || 600;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // ============================================================
+        // 2. ЗАГРУЗКА ТЕКСТУР (1.png - 5.png как скины)
+        // ============================================================
+        const textures = {
+            chicken: null,
+            bum: null,
+            pig: null,
+            stepfather: null,
+            monkey: null
+        };
+
+        // Скины из PNG
+        const skinTextures = [
+            { id: 'chicken', name: 'Курица', file: '1.png', emoji: '🐔' },
+            { id: 'bum', name: 'Бомж', file: '2.png', emoji: '🧟' },
+            { id: 'pig', name: 'Свин', file: '3.png', emoji: '🐷' },
+            { id: 'stepfather', name: 'Отчим', file: '4.png', emoji: '👨' },
+            { id: 'monkey', name: 'Обезьяна', file: '5.png', emoji: '🐒' }
+        ];
+
+        function loadTextures() {
+            skinTextures.forEach(skin => {
+                const img = new Image();
+                img.src = skin.file;
+                textures[skin.id] = img;
+                img.onerror = () => console.warn(`Не удалось загрузить ${skin.file}`);
+            });
+        }
+        loadTextures();
+
+        // ============================================================
+        // 3. ИГРОВЫЕ ПЕРЕМЕННЫЕ
+        // ============================================================
+        const player = {
+            x: 200,
+            y: 300,
+            w: 32,
+            h: 32,
+            hp: 100,
+            maxHp: 100,
+            speed: 3,
+            vx: 0,
+            vy: 0
+        };
+
+        const weapons = {
+            pistol: { name: 'Пистолет', damage: 15, fireRate: 10, speed: 8, icon: '🔫', price: 0 },
+            ak47: { name: 'AK-47', damage: 25, fireRate: 4, speed: 10, icon: '🔫', price: 5000 },
+            m16: { name: 'M16', damage: 20, fireRate: 3, speed: 12, icon: '🔫', price: 8000 },
+            rpg: { name: 'RPG', damage: 80, fireRate: 30, speed: 5, icon: '💥', price: 15000 },
+            awp: { name: 'AWP', damage: 50, fireRate: 20, speed: 15, icon: '🎯', price: 12000 }
+        };
+
+        let currentWeapon = 'pistol';
+        let fireCooldown = 0;
+        let ownedWeapons = ['pistol'];
+        let currentSkin = 'chicken';
+        let ownedSkins = ['chicken'];
+        let money = 0;
+        let score = 0;
+        let gameRunning = false;
+        let gameOver = false;
+        let frameCount = 0;
+
+        // Объекты игры
+        let bullets = [];
+        let enemies = [];
+        let particles = [];
+
+        const settings = {
+            sensitivity: 5,
+            graphics: 'medium'
+        };
+
+        // Управление
+        const keys = { up: false, down: false, left: false, right: false };
+
+        // ============================================================
+        // 4. КЛАССЫ РЕЖИМОВ (упрощённые)
+        // ============================================================
+        class GameMode {
+            constructor() {
+                this.name = 'Базовый';
+                this.icon = '🎮';
+                this.description = 'Описание';
+                this.enemies = [];
+                this.pickups = [];
+                this.particles = [];
+                this.bullets = [];
+                this.score = 0;
+                this.spawnTimer = 0;
+            }
+
+            update() {
+                this.spawnTimer++;
+                this.bullets.forEach(b => b.y -= b.speed);
+                this.bullets = this.bullets.filter(b => b.y > -50);
+                
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.1;
+                    p.life--;
+                });
+                this.particles = this.particles.filter(p => p.life > 0);
+            }
+
+            createParticles(x, y, color, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6 - 2,
+                        life: 20 + Math.random() * 20,
+                        maxLife: 40,
+                        size: 2 + Math.random() * 4,
+                        color: color
+                    });
+                }
+            }
+        }
+
+        // Режим: Противники
+        class VersusMode extends GameMode {
+            constructor() {
+                super();
+                this.name = 'Противники';
+                this.icon = '👊';
+                this.description = 'Уничтожай врагов';
+            }
+
+            update() {
+                super.update();
+                
+                if (this.spawnTimer > 60) {
+                    this.spawnTimer = 0;
+                    if (Math.random() < 0.3) {
+                        const types = ['bum', 'pig', 'monkey'];
+                        const type = types[Math.floor(Math.random() * types.length)];
+                        this.enemies.push({
+                            x: Math.random() * (canvas.width - 30),
+                            y: -30,
+                            w: 28,
+                            h: 28,
+                            hp: 30,
+                            maxHp: 30,
+                            speed: 0.5 + Math.random() * 1.5,
+                            type: type
+                        });
+                    }
+                }
+
+                this.enemies.forEach(e => e.y += e.speed);
+                this.enemies = this.enemies.filter(e => e.y < canvas.height + 50);
+
+                // Столкновения
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    for (let j = this.enemies.length - 1; j >= 0; j--) {
+                        const b = this.bullets[i];
+                        const e = this.enemies[j];
+                        if (b.x < e.x + e.w && b.x + b.w > e.x &&
+                            b.y < e.y + e.h && b.y + b.h > e.y) {
+                            e.hp -= b.damage;
+                            this.bullets.splice(i, 1);
+                            this.createParticles(b.x, b.y, '#ff4444', 8);
+                            if (e.hp <= 0) {
+                                this.enemies.splice(j, 1);
+                                this.score += 10;
+                                this.createParticles(e.x + e.w/2, e.y + e.h/2, '#ffdd00', 20);
+                                return 20 + Math.floor(Math.random() * 30);
+                            }
+                            break;
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            draw(ctx) {
+                // Рисуем врагов
+                this.enemies.forEach(e => {
+                    const tex = textures[e.type];
+                    if (tex && tex.complete && tex.naturalWidth) {
+                        ctx.drawImage(tex, e.x, e.y, e.w, e.h);
+                    } else {
+                        ctx.fillStyle = '#8e44ad';
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                        ctx.fillStyle = 'white';
+                        ctx.font = '16px sans-serif';
+                        ctx.fillText('🧟', e.x + 4, e.y + 20);
+                    }
+                    const hpPercent = e.hp / e.maxHp;
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillRect(e.x, e.y - 8, e.w, 4);
+                    ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f1c40f' : '#e74c3c';
+                    ctx.fillRect(e.x, e.y - 8, e.w * hpPercent, 4);
+                });
+
+                // Пули
+                this.bullets.forEach(b => {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#f1c40f';
+                    ctx.fillRect(b.x, b.y, b.w, b.h);
+                    ctx.shadowBlur = 0;
+                });
+
+                // Частицы
+                this.particles.forEach(p => {
+                    const alpha = p.life / p.maxLife;
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+                });
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        let currentMode = new VersusMode();
+
+        // ============================================================
+        // 5. ФУНКЦИИ МАГАЗИНА
+        // ============================================================
+        function buyItem(type, id) {
+            let item, price;
+            
+            if (type === 'weapon') {
+                item = weapons[id];
+                price = item.price;
+                if (ownedWeapons.includes(id)) {
+                    showMessage('Уже куплено!');
+                    return;
+                }
+            } else if (type === 'skin') {
+                const skin = skinTextures.find(s => s.id === id);
+                if (!skin) return;
+                price = 5000; // Цена скина
+                if (ownedSkins.includes(id)) {
+                    showMessage('Уже куплено!');
+                    return;
+                }
+                if (money < price) {
+                    showMessage('Недостаточно денег! 💰');
+                    return;
+                }
+                money -= price;
+                ownedSkins.push(id);
+                currentSkin = id;
+                showMessage(`Скин ${skin.name} активирован!`);
+                updateMoney();
+                renderShop();
+                return;
+            }
+
+            if (money < price) {
+                showMessage('Недостаточно денег! 💰');
+                return;
+            }
+
+            money -= price;
+            updateMoney();
+            
+            if (type === 'weapon') {
+                ownedWeapons.push(id);
+                showMessage(`Куплено: ${item.name}!`);
+            }
+
+            renderShop();
+            updateWeaponDisplay();
+        }
+
+        function updateMoney() {
+            document.getElementById('moneyDisplay').textContent = `💰 ${money}`;
+            document.getElementById('shopMoney').textContent = money;
+        }
+
+        function showMessage(text) {
+            const msg = document.createElement('div');
+            msg.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.9);
+                color: #f1c40f;
+                padding: 16px 32px;
+                border-radius: 12px;
+                border: 2px solid #e94560;
+                font-family: monospace;
+                font-size: 18px;
+                z-index: 300;
+                pointer-events: none;
+                animation: fadeOut 1.5s forwards;
+            `;
+            document.getElementById('gameContainer').appendChild(msg);
+            
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeOut {
+                    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            setTimeout(() => {
+                msg.remove();
+                style.remove();
+            }, 1500);
+        }
+
+        // ============================================================
+        // 6. ОТОБРАЖЕНИЕ ОРУЖИЯ
+        // ============================================================
+        function updateWeaponDisplay() {
+            const weapon = weapons[currentWeapon];
+            document.getElementById('weaponIcon').textContent = weapon.icon;
+            document.getElementById('weaponName').textContent = weapon.name;
+            document.getElementById('weaponDamage').textContent = `Урон: ${weapon.damage}`;
+        }
+
+        // ============================================================
+        // 7. РЕНДЕРИНГ МАГАЗИНА
+        // ============================================================
+        function renderShop() {
+            const weaponShop = document.getElementById('weaponShop');
+            weaponShop.innerHTML = '';
+            
+            Object.keys(weapons).forEach(key => {
+                const w = weapons[key];
+                const owned = ownedWeapons.includes(key);
+                const div = document.createElement('div');
+                div.className = 'shop-item';
+                div.innerHTML = `
+                    <div class="shop-item-info">
+                        <span style="font-size:24px;">${w.icon}</span>
+                        <div>
+                            <div class="name">${w.name}</div>
+                            <div class="price">${owned ? '✅ Куплено' : `💰 ${w.price} ZWD`}</div>
+                        </div>
+                    </div>
+                    <button class="shop-buy-btn" ${owned ? 'disabled' : ''} onclick="buyItem('weapon','${key}')">
+                        ${owned ? '✅' : 'Купить'}
+                    </button>
+                `;
+                weaponShop.appendChild(div);
+            });
+
+            const skinShop = document.getElementById('skinShop');
+            skinShop.innerHTML = '';
+            
+            skinTextures.forEach(skin => {
+                const owned = ownedSkins.includes(skin.id);
+                const active = currentSkin === skin.id;
+                const div = document.createElement('div');
+                div.className = `skin-item ${active ? 'active' : ''}`;
+                const img = textures[skin.id];
+                div.innerHTML = `
+                    ${img && img.complete && img.naturalWidth ? 
+                        `<img src="${img.src}" alt="${skin.name}">` : 
+                        `<div style="font-size:32px;">${skin.emoji}</div>`}
+                    <div class="skin-name">${skin.name}</div>
+                    <div style="font-size:10px;color:#666;">
+                        ${owned ? (active ? '✅ Активен' : '✅ Куплен') : `💰 5000 ZWD`}
+                    </div>
+                `;
+                div.onclick = () => {
+                    if (owned) {
+                        currentSkin = skin.id;
+                        renderShop();
+                        showMessage(`Скин ${skin.name} активирован!`);
+                    } else {
+                        buyItem('skin', skin.id);
+                    }
+                };
+                skinShop.appendChild(div);
+            });
+
+            updateMoney();
+        }
+
+        // ============================================================
+        // 8. РЕЖИМЫ
+        // ============================================================
+        function renderModes() {
+            const grid = document.getElementById('modeGrid');
+            grid.innerHTML = '';
+            const modes = [
+                { name: 'Противники', icon: '👊', desc: 'Уничтожай врагов' },
+                { name: 'Холодос', icon: '❄️', desc: 'Заморозка врагов' },
+                { name: 'Грабеж', icon: '💰', desc: 'Собирай ценности' },
+                { name: 'Дворец', icon: '🏰', desc: 'Захват точек' }
+            ];
+            modes.forEach((m, i) => {
+                const div = document.createElement('div');
+                div.className = 'mode-card';
+                div.innerHTML = `
+                    <span class="icon">${m.icon}</span>
+                    <div class="name">${m.name}</div>
+                    <div class="desc">${m.desc}</div>
+                `;
+                div.onclick = () => {
+                    currentMode = new VersusMode();
+                    currentMode.name = m.name;
+                    currentMode.icon = m.icon;
+                    currentMode.description = m.desc;
+                    closeModal('modeModal');
+                    showMessage(`Режим: ${m.name}`);
+                };
+                grid.appendChild(div);
+            });
+        }
+
+        // ============================================================
+        // 9. МОДАЛЬНЫЕ ОКНА
+        // ============================================================
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            if (id === 'shopModal') renderShop();
+            if (id === 'modeModal') renderModes();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        // ============================================================
+        // 10. НАСТРОЙКИ
+        // ============================================================
+        document.getElementById('sensitivitySlider').addEventListener('input', (e) => {
+            settings.sensitivity = parseInt(e.target.value);
+        });
+
+        document.getElementById('graphicsSelect').addEventListener('change', (e) => {
+            settings.graphics = e.target.value;
+        });
+
+        // ============================================================
+        // 11. УПРАВЛЕНИЕ
+        // ============================================================
+        // Кнопки D-pad
+        document.getElementById('btnUp').addEventListener('touchstart', (e) => { e.preventDefault(); keys.up = true; });
+        document.getElementById('btnUp').addEventListener('touchend', () => { keys.up = false; });
+        document.getElementById('btnDown').addEventListener('touchstart', (e) => { e.preventDefault(); keys.down = true; });
+        document.getElementById('btnDown').addEventListener('touchend', () => { keys.down = false; });
+        document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); keys.left = true; });
+        document.getElementById('btnLeft').addEventListener('touchend', () => { keys.left = false; });
+        document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); keys.right = true; });
+        document.getElementById('btnRight').addEventListener('touchend', () => { keys.right = false; });
+
+        // Стрельба
+        document.getElementById('btnShoot').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) shoot();
+        });
+
+        // Клавиатура
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'w' || e.key === 'ArrowUp') keys.up = true;
+            if (e.key === 's' || e.key === 'ArrowDown') keys.down = true;
+            if (e.key === 'a' || e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'd' || e.key === 'ArrowRight') keys.right = true;
+            if (e.key === ' ') { e.preventDefault(); if (gameRunning) shoot(); }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'w' || e.key === 'ArrowUp') keys.up = false;
+            if (e.key === 's' || e.key === 'ArrowDown') keys.down = false;
+            if (e.key === 'a' || e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'd' || e.key === 'ArrowRight') keys.right = false;
+        });
+
+        // ============================================================
+        // 12. СТРЕЛЬБА
+        // ============================================================
+        function shoot() {
+            if (gameOver || !gameRunning) return;
+            if (fireCooldown > 0) return;
+            
+            const weapon = weapons[currentWeapon];
+            fireCooldown = weapon.fireRate;
+            
+            currentMode.bullets.push({
+                x: player.x + player.w / 2 - 3,
+                y: player.y - 10,
+                w: 6,
+                h: 16,
+                speed: weapon.speed,
+                damage: weapon.damage
+            });
+            
+            currentMode.createParticles(player.x + player.w/2, player.y, '#f1c40f', 5);
+        }
+
+        // ============================================================
+        // 13. ИГРОВАЯ ЛОГИКА
+        // ============================================================
+        function update() {
+            if (!gameRunning || gameOver) return;
+            
+            frameCount++;
+            if (fireCooldown > 0) fireCooldown--;
+            
+            // Движение игрока
+            let dx = 0, dy = 0;
+            if (keys.left) dx = -player.speed;
+            if (keys.right) dx = player.speed;
+            if (keys.up) dy = -player.speed;
+            if (keys.down) dy = player.speed;
+            
+            // Нормализация диагонали
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.707;
+                dy *= 0.707;
+            }
+            
+            player.x += dx;
+            player.y += dy;
+            
+            // Границы
+            player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.h, player.y));
+            
+            // Обновляем режим
+            const earned = currentMode.update();
+            if (earned > 0) {
+                money += earned;
+                updateMoney();
+            }
+            
+            // Проверка смерти
+            if (player.hp <= 0) {
+                gameOver = true;
+                showMessage('💀 ИГРА ОКОНЧЕНА!');
+            }
+        }
+
+        // ============================================================
+        // 14. ОТРИСОВКА
+        // ============================================================
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Фон
+            const grad = ctx.createRadialGradient(
+                canvas.width/2, canvas.height/2, 100,
+                canvas.width/2, canvas.height/2, canvas.width
+            );
+            grad.addColorStop(0, '#1a1a3e');
+            grad.addColorStop(1, '#0a0a1a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем пол (сетка)
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 50) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+            
+            // Рисуем режим
+            if (currentMode) {
+                currentMode.draw(ctx);
+            }
+            
+            // Рисуем игрока со скином
+            const skinTex = textures[currentSkin];
+            if (skinTex && skinTex.complete && skinTex.naturalWidth) {
+                ctx.drawImage(skinTex, player.x, player.y, player.w, player.h);
+            } else {
+                ctx.fillStyle = '#f5c842';
+                ctx.fillRect(player.x, player.y, player.w, player.h);
+                ctx.fillStyle = '#c0392b';
+                ctx.font = '20px sans-serif';
+                ctx.fillText('🐔', player.x + 4, player.y + 24);
+            }
+            
+            // Обводка игрока
+            ctx.strokeStyle = 'rgba(241, 196, 15, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(player.x, player.y, player.w, player.h);
+            
+            // Обновляем HUD
+            const hpPercent = player.hp / player.maxHp * 100;
+            document.getElementById('hpFill').style.width = hpPercent + '%';
+            document.getElementById('hpText').textContent = Math.floor(player.hp);
+            
+            // Счёт
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = '12px monospace';
+            ctx.fillText(`🎯 ${currentMode.score || 0}`, canvas.width - 60, 30);
+            ctx.fillText(`📊 ${currentMode.name}`, 10, 30);
+            
+            // Game Over
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#e94560';
+                ctx.font = 'bold 40px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('💀 GAME OVER', canvas.width/2, canvas.height/2 - 20);
+                ctx.fillStyle = 'white';
+                ctx.font = '18px sans-serif';
+                ctx.fillText('Нажмите меню для рестарта', canvas.width/2, canvas.height/2 + 40);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // ============================================================
+        // 15. ИГРОВОЙ ЦИКЛ
+        // ============================================================
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================
+        // 16. ЗАПУСК ИГРЫ
+        // ============================================================
+        function startGame() {
+            document.getElementById('menuOverlay').classList.add('hidden');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('weaponDisplay').style.display = 'flex';
+            document.getElementById('controls').style.display = 'flex';
+            
+            gameRunning = true;
+            gameOver = false;
+            player.hp = player.maxHp;
+            player.x = canvas.width/2 - player.w/2;
+            player.y = canvas.height/2 - player.h/2;
+            money = 0;
+            updateMoney();
+            updateWeaponDisplay();
+            currentMode = new VersusMode();
+            
+            showMessage('🎮 Игра началась!');
+        }
+
+        // ============================================================
+        // 17. ГЛОБАЛЬНЫЕ ФУНКЦИИ
+        // ============================================================
+        window.startGame = startGame;
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.buyItem = buyItem;
+
+        // ============================================================
+        // 18. ЗАПУСК
+        // ============================================================
+        renderShop();
+        renderModes();
+        gameLoop();
+
+        console.log('🐔 ChickenGun Kotnot Edition v3.0');
+        console.log('📖 Скины: 1.png-5.png загружаются как скины');
+        console.log('🎮 Управление: WASD/стрелки или тач-контроллер');
+        console.log('💥 Стрельба: пробел или кнопка 💥');
+        console.log('💰 Валюта: Зимбабвийский Доллар (ZWD)');
+    </script>
+</body>
+  </html>
